@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
@@ -28,7 +29,8 @@ class DisplayScreen extends StatefulWidget {
   State<DisplayScreen> createState() => _DisplayScreenState();
 }
 
-class _DisplayScreenState extends State<DisplayScreen> {
+class _DisplayScreenState extends State<DisplayScreen>
+  with WidgetsBindingObserver {
   static const String _displayUrl =
       'https://smart-task-manager-tan.vercel.app/display';
   static const String _hideFullscreenControlsScript = '''
@@ -87,6 +89,8 @@ class _DisplayScreenState extends State<DisplayScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _enterFullscreenMode();
     _supportsWebView = !kIsWeb &&
         (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
 
@@ -112,6 +116,32 @@ class _DisplayScreenState extends State<DisplayScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _enterFullscreenMode();
+    }
+  }
+
+  Future<void> _enterFullscreenMode() async {
+    if (kIsWeb) {
+      return;
+    }
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!_supportsWebView || _controller == null) {
       return const Scaffold(
@@ -131,9 +161,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: WebViewWidget(controller: _controller!),
-      ),
+      body: WebViewWidget(controller: _controller!),
     );
   }
 }
