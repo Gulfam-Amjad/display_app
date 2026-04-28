@@ -31,6 +31,55 @@ class DisplayScreen extends StatefulWidget {
 class _DisplayScreenState extends State<DisplayScreen> {
   static const String _displayUrl =
       'https://smart-task-manager-tan.vercel.app/display';
+  static const String _hideFullscreenControlsScript = '''
+(function () {
+  const matches = (value) => /full\\s*screen|fullscreen/i.test(value || '');
+  const hide = (element) => {
+    if (!element || !element.style) return;
+    element.style.setProperty('display', 'none', 'important');
+    element.style.setProperty('visibility', 'hidden', 'important');
+    element.style.setProperty('pointer-events', 'none', 'important');
+  };
+
+  const scan = () => {
+    document.querySelectorAll('*').forEach((element) => {
+      const label = [
+        element.getAttribute('aria-label'),
+        element.getAttribute('title'),
+        element.id,
+        element.className,
+        element.textContent,
+      ].join(' ');
+
+      if (matches(label)) {
+        hide(element);
+      }
+
+      const style = window.getComputedStyle(element);
+      if (
+        (style.position === 'fixed' || style.position === 'absolute') &&
+        element.getBoundingClientRect().width < 140 &&
+        element.getBoundingClientRect().height < 140
+      ) {
+        const rect = element.getBoundingClientRect();
+        const nearBottomRight =
+          rect.right >= window.innerWidth - 24 &&
+          rect.bottom >= window.innerHeight - 24;
+        if (nearBottomRight && matches(label)) {
+          hide(element);
+        }
+      }
+    });
+  };
+
+  scan();
+  new MutationObserver(scan).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+  });
+})();
+''';
 
   late final bool _supportsWebView;
   WebViewController? _controller;
@@ -47,6 +96,9 @@ class _DisplayScreenState extends State<DisplayScreen> {
         ..setBackgroundColor(Colors.white)
         ..setNavigationDelegate(
           NavigationDelegate(
+            onPageFinished: (String url) {
+              _controller?.runJavaScript(_hideFullscreenControlsScript);
+            },
             onNavigationRequest: (request) {
               if (request.url.startsWith(_displayUrl)) {
                 return NavigationDecision.navigate;
